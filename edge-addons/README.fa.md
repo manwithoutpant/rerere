@@ -53,7 +53,7 @@ sudo ufw allow in proto udp to 2a09:e683:6:13::a port 25443 comment edge-addons
 
 ```bash
 curl -fL --retry 3 --connect-timeout 15 --max-time 180 \
-  'https://raw.githubusercontent.com/manwithoutpant/rerere/0a2d58e660a587efcd8feb7975956a2cee4a8b95/edge-addons/setup.sh' \
+  'https://raw.githubusercontent.com/manwithoutpant/rerere/f89643d85b74a4fbe4458bf88ad529c6b4b2fcd4/edge-addons/setup.sh' \
   -o /root/setup-edge.sh &&
 sudo bash /root/setup-edge.sh foreign
 ```
@@ -122,11 +122,11 @@ $edgeProxy = 'socks5h://127.0.0.1:10808'
 $edgeFile = Join-Path $env:TEMP ('edge-' + [guid]::NewGuid().ToString('N') + '.bin')
 try {
     curl.exe --fail --location --max-time 45 --noproxy no-bypass.invalid --proxy $edgeProxy `
-      'https://raw.githubusercontent.com/manwithoutpant/rerere/71bd0456f49b03a5ca14286169634e50e2cfa475/edge-addons/test_native.py' `
+      'https://raw.githubusercontent.com/manwithoutpant/rerere/cd873bbb7262382e7fa7e630c53fe079edc8b832/edge-addons/test_native.py' `
       --output $edgeFile
     if ($LASTEXITCODE -ne 0) { throw 'HTTPS transfer failed' }
     $edgeHash = (Get-FileHash -LiteralPath $edgeFile -Algorithm SHA256).Hash.ToLowerInvariant()
-    if ($edgeHash -ne '70034e80eaf085a43f94209bdd685fea409299e81fef7b82dbf5049a123070e2') { throw 'Data hash mismatch' }
+    if ($edgeHash -ne 'bc8efe99007971121ff0b70dccf87f8ac15cbbcfe645de22c78f1e6241184d84') { throw 'Data hash mismatch' }
     Write-Host 'PASS: verified HTTPS and exact file contents'
     curl.exe --fail --max-time 20 --noproxy no-bypass.invalid --proxy $edgeProxy 'https://api.ipify.org'
 } finally {
@@ -136,7 +136,7 @@ try {
 
 ipify فقط مشاهدهٔ IP خروجی است؛ خرابی آن به‌تنهایی خرابی پروتکل را ثابت نمی‌کند. تست هش را برای هر چهار لینک روی اینترنت ثابت و همراه تکرار کنید. تست سرور به‌تنهایی مسیر ویندوز تا ایران، UDP اپراتور یا پایداری طولانی را تأیید نمی‌کند.
 
-آزمون بومی قبل از نصب شامل چهار مسیر XHTTP/TUIC مستقیم و از ایران به خارج، دانلود و آپلود HTTPS با 524288 بایت در هر مسیر و تطبیق هش، بازگشت UDP تصادفی 64 و 1200 بایتی، و رد رمز غلط TUIC است. لاگ در `/opt/edge-addons/private/native-lab.log` ذخیره می‌شود. این شرح **آزمون گنجانده‌شده** است، نه اعلام نتیجهٔ پیشاپیش آن.
+آزمون بومی روی پورت‌های آزاد و تصادفی loopback اجرا می‌شود و شامل چهار مسیر XHTTP/TUIC مستقیم و از ایران به خارج، دانلود و آپلود HTTPS با 524288 بایت در هر مسیر و تطبیق هش، بازگشت UDP تصادفی 64 و 1200 بایتی، و رد رمز غلط TUIC است. لاگ در `/opt/edge-addons/private/native-lab.log` ذخیره می‌شود. این شرح **آزمون گنجانده‌شده** است، نه اعلام نتیجهٔ پیشاپیش آن.
 
 ## مدیریت و بازگشت
 
@@ -182,8 +182,8 @@ sudo python3 /opt/edge-addons/edge_addons.py renew \
 - [Caddy reverse_proxy و h2c](https://caddyserver.com/docs/caddyfile/directives/reverse_proxy)
 - [lego Cloudflare DNS-01](https://go-acme.github.io/lego/dns/cloudflare/)
 - Xray v26.3.27، sing-box v1.14.3، Caddy v2.11.7 و lego v5.5.2؛ URL و SHA256 آرشیوها در ASSETS نصاب ثابت‌اند. هستهٔ هیچ سرویس دیگری ارتقا نمی‌یابد.
-- commit کد و آزمون: `71bd0456f49b03a5ca14286169634e50e2cfa475`
+- commit کد و آزمون: `cd873bbb7262382e7fa7e630c53fe079edc8b832`
 - SHA256 نصاب: `f22a64cdcb759ba5f8b797ec2eec6152ded8cd0117635212fbc4e8a757be0f61`
-- SHA256 آزمون: `70034e80eaf085a43f94209bdd685fea409299e81fef7b82dbf5049a123070e2`
+- SHA256 آزمون: `bc8efe99007971121ff0b70dccf87f8ac15cbbcfe645de22c78f1e6241184d84`
 
 [وضعیت Actions](https://github.com/manwithoutpant/rerere/actions/workflows/edge-addons-check.yml)
