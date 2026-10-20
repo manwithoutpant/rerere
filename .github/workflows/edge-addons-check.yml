@@ -1,8 +1,5 @@
 name: Edge add-ons native verification
 on:
-  push:
-    branches: [edge-addons-tuic-xhttp]
-    paths: ['edge-addons/**', '.github/workflows/edge-addons-check.yml']
   workflow_dispatch:
 permissions:
   contents: read
