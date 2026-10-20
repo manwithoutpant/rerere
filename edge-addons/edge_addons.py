@@ -3,6 +3,7 @@
 import argparse
 import contextlib
 import copy
+import ctypes
 import datetime
 import fcntl
 import getpass
@@ -69,6 +70,8 @@ ASSETS = {
         "member": "lego",
     },
 }
+
+LIBC = ctypes.CDLL(None, use_errno=True)
 
 class Failure(RuntimeError):
     pass
@@ -458,9 +461,14 @@ def dns_bridge(proxy):
 
 @contextlib.contextmanager
 def process(args, log):
+    parent_pid = os.getpid()
+    def lifetime():
+        # Test clients and ACME jobs must not outlive a killed installer.
+        if LIBC.prctl(1, signal.SIGTERM, 0, 0, 0) != 0 or os.getppid() != parent_pid:
+            os._exit(1)
     with open(log, "w") as output:
         p = subprocess.Popen([str(x) for x in args], stdout=output, stderr=output,
-                             start_new_session=True)
+                             start_new_session=True, preexec_fn=lifetime)
         try:
             yield p
         finally:
@@ -698,6 +706,30 @@ def check_live(state):
             verified_data(port, origin, tmp / "payload")
     say("PASS both local native clients. Internet-to-server reachability remains unverified.")
 
+def self_lab():
+    """Run native data-plane tests before ANY new systemd unit is written."""
+    source = pathlib.Path(__file__).resolve().with_name("test_native.py")
+    if not source.is_file() or source.is_symlink():
+        raise Failure("Matching test_native.py is required beside the installer.")
+    target = ROOT / "test_native.py"
+    if source != target:
+        shutil.copyfile(source, target)
+    say("Running isolated native lab: real HTTPS upload/download and UDP payloads.")
+    logfile = ROOT / "private/native-lab.log"
+    with process([sys.executable, target, "--offline-dir", ROOT], logfile) as p:
+        deadline = time.monotonic() + 240
+        progress = time.monotonic() + 20
+        while p.poll() is None:
+            if time.monotonic() >= deadline:
+                raise Failure("Native lab timed out; no new services activated. See " + str(logfile))
+            if time.monotonic() >= progress:
+                say("Native data-plane verification is still running ...")
+                progress += 20
+            time.sleep(.25)
+        if p.returncode:
+            raise Failure("Native data-plane lab failed; no new services activated. See " + str(logfile))
+    say("PASS native lab: both protocols, direct and via foreign XHTTP, actual data checked.")
+
 def installation(args):
     require_root()
     if ROOT.exists() or ROOT.is_symlink():
@@ -707,6 +739,9 @@ def installation(args):
     if args.role == "iran" and not args.peer_file:
         raise Failure("Iran role needs --peer-file from the NEW foreign installation.")
     peer = validate_peer(read_json(args.peer_file)) if args.role == "iran" else None
+    available = next((int(line.split()[1]) for line in pathlib.Path("/proc/meminfo").read_text().splitlines() if line.startswith("MemAvailable:")), 0)
+    if available < 384 * 1024:
+        raise Failure("Need at least 384 MiB available RAM for the bounded native lab; nothing changed.")
     state = new_state(args.role, args.domain, args.bind_ip, args.ipv6, args.port, peer)
     if ipaddress.ip_address(state["address"]).version != 4:
         raise Failure("--bind-ip must be an assigned IPv4 address.")
@@ -723,6 +758,7 @@ def installation(args):
         shutil.copyfile(pathlib.Path(__file__).resolve(), ROOT / "edge_addons.py")
         os.chmod(ROOT / "edge_addons.py", 0o755)
         prepare_binaries(ROOT, args.offline_dir)
+        self_lab()
         write_json(ROOT / "private/baseline.json", before)
         install_certificate(state, args.cert, args.key)
         native_checks(state)
@@ -807,6 +843,7 @@ def bundle(args):
     # An explicit allowlist excludes state, passwords, CF token and certificate keys.
     with tarfile.open(output, "w:gz") as archive:
         archive.add(ROOT / "edge_addons.py", arcname="edge-offline/edge_addons.py")
+        archive.add(ROOT / "test_native.py", arcname="edge-offline/test_native.py")
         for asset in ASSETS.values():
             source = ROOT / "payload" / asset["file"]
             if sha(source) != asset["sha256"]:
