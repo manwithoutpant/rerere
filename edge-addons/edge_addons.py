@@ -376,7 +376,8 @@ def baseline():
         if shutil.which(cmd[0]):
             p = run(cmd, check=False)
             if p.returncode == 0:
-                firewall[cmd[0]] = hashlib.sha256(p.stdout.encode()).hexdigest()
+                normalized = re.sub(r"counter packets \d+ bytes \d+", "counter", p.stdout)
+                firewall[cmd[0]] = hashlib.sha256(normalized.encode()).hexdigest()
     return {"pids": units, "file_sha256": files, "firewall_sha256": firewall}
 
 def check_baseline(old):
@@ -466,6 +467,12 @@ def process(args, log):
         # Test clients and ACME jobs must not outlive a killed installer.
         if LIBC.prctl(1, signal.SIGTERM, 0, 0, 0) != 0 or os.getppid() != parent_pid:
             os._exit(1)
+        try:
+            fd = os.open("/proc/self/oom_score_adj", os.O_WRONLY)
+            os.write(fd, b"500")
+            os.close(fd)
+        except OSError:
+            pass
     with open(log, "w") as output:
         p = subprocess.Popen([str(x) for x in args], stdout=output, stderr=output,
                              start_new_session=True, preexec_fn=lifetime)
@@ -603,7 +610,7 @@ def unit_text(name, executable, config_name, certs=False):
              "RestrictSUIDSGID=yes\nLockPersonality=yes\nUMask=0077\n"
              "RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX\n"
              "CapabilityBoundingSet=\nAmbientCapabilities=\n"
-             "LimitNOFILE=16384\nNice=5\nCPUWeight=25\n")
+             "LimitNOFILE=16384\nNice=5\nCPUWeight=25\nOOMScoreAdjust=500\n")
     text += "LoadCredential=config.json:" + str(ROOT / "private" / config_name) + "\n"
     if certs:
         text += ("LoadCredential=tls.crt:" + str(ROOT / "private/tls.crt") + "\n"
@@ -745,6 +752,8 @@ def installation(args):
     state = new_state(args.role, args.domain, args.bind_ip, args.ipv6, args.port, peer)
     if ipaddress.ip_address(state["address"]).version != 4:
         raise Failure("--bind-ip must be an assigned IPv4 address.")
+    if state.get("ipv6") and ipaddress.ip_address(state["ipv6"]).version != 6:
+        raise Failure("--ipv6 must be an assigned IPv6 address.")
     preflight(state)
     before = baseline()
     token = secrets.token_hex(24)
