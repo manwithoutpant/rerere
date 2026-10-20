@@ -1,0 +1,21 @@
+name: Edge add-ons native verification
+on:
+  push:
+    branches: [edge-addons-tuic-xhttp]
+    paths: ['edge-addons/**', '.github/workflows/edge-addons-check.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: edge-addons-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  native:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Compile Python
+        run: python3 -m py_compile edge-addons/edge_addons.py edge-addons/test_native.py
+      - name: Native cores and actual TCP/UDP data
+        run: sudo --preserve-env=GITHUB_ACTIONS python3 -u edge-addons/test_native.py --systemd
