@@ -137,9 +137,9 @@ def data_roundtrip(socks_port, origin_port, ca, base):
 def native_tests(base, offline=None):
     bins = e.prepare_binaries(base, offline)
     ca, cert, key = certificates(base)
-    foreign = e.new_state("foreign", "edge-foreign.test", "127.0.0.2", port=25443)
+    foreign = e.new_state("foreign", "edge-foreign.test", "127.0.0.2", ipv6="::1", port=25443)
     peer = e.public_peer(foreign)
-    iran = e.new_state("iran", "edge-iran.test", "127.0.0.3", port=26443, peer=peer)
+    iran = e.new_state("iran", "edge-iran.test", "127.0.0.3", ipv6="::1", port=26443, peer=peer)
     assert not e.xhttp_out(peer)["streamSettings"]["tlsSettings"]["allowInsecure"]
     assert not e.tuic_client_out(foreign)["tls"]["insecure"]
     help_text = checked([bins / "lego", "--help"]).stdout.decode()
