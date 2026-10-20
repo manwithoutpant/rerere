@@ -42,8 +42,12 @@ CERT_TIMER = PREFIX + "-renew.timer"
 GUARD = PREFIX + "-guard"
 UNIT_ROOT = pathlib.Path("/etc/systemd/system")
 MARKER = "# Managed exclusively by edge-addons 0.1"
-BLOB = ("edge-addons:data-integrity:v1\n" * 4096).encode()
-BLOB_PATH = "/health/data-v1"
+BLOB = ("0123456789abcdefghijklmnopqrstuvwxyz\n" * 4096).encode()
+
+def blob_path(state):
+    # No publicly predictable diagnostic URL or tool-specific response marker.
+    token = hashlib.sha256((state["uuid"] + ":data-v1").encode()).hexdigest()[:40]
+    return "/assets/" + token + ".txt"
 ASSETS = {
     "xray": {
         "file": "Xray-linux-64.zip",
@@ -264,7 +268,7 @@ def caddy_config(state, cert, key):
                                 "flush_interval": -1}],
                     "terminal": True,
                 }, {
-                    "match": [{"host": [state["domain"]], "path": [BLOB_PATH]}],
+                    "match": [{"host": [state["domain"]], "path": [blob_path(state)]}],
                     "handle": [{"handler": "static_response", "status_code": 200,
                                 "headers": {"Content-Type": ["application/octet-stream"],
                                             "Cache-Control": ["no-store"]},
@@ -678,7 +682,7 @@ def socks_client_config(out, port):
 
 def verified_data(socks_port, origin, output, ca=None):
     # The destination is loopback ON THE EXIT SERVER, through both proxy layers.
-    url = "https://" + origin["domain"] + ":" + str(origin["port"]) + BLOB_PATH
+    url = "https://" + origin["domain"] + ":" + str(origin["port"]) + blob_path(origin)
     args = ["curl", "--silent", "--show-error", "--fail", "--max-time", "30",
             "--noproxy", "", "--socks5-hostname", "127.0.0.1:" + str(socks_port),
             "--connect-to", origin["domain"] + ":" + str(origin["port"]) +
