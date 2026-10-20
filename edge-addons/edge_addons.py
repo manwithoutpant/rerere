@@ -329,6 +329,7 @@ def prepare_binaries(base, offline=None):
     bindir = pathlib.Path(base) / "bin"
     cache.mkdir(mode=0o700)
     bindir.mkdir(mode=0o755)
+    os.chmod(bindir, 0o755)
     for name, asset in ASSETS.items():
         path = cache / asset["file"]
         if offline:
@@ -703,9 +704,9 @@ def installation(args):
         raise Failure("Add-on directory already exists. Use status/check/uninstall; no overwrite performed.")
     if not 1024 <= args.port <= 65531:
         raise Failure("Port must be between 1024 and 65531.")
-    peer = validate_peer(read_json(args.peer_file)) if args.role == "iran" else None
     if args.role == "iran" and not args.peer_file:
         raise Failure("Iran role needs --peer-file from the NEW foreign installation.")
+    peer = validate_peer(read_json(args.peer_file)) if args.role == "iran" else None
     state = new_state(args.role, args.domain, args.bind_ip, args.ipv6, args.port, peer)
     if ipaddress.ip_address(state["address"]).version != 4:
         raise Failure("--bind-ip must be an assigned IPv4 address.")
@@ -715,6 +716,7 @@ def installation(args):
     created = False
     try:
         ROOT.mkdir(mode=0o755)
+        os.chmod(ROOT, 0o755)
         created = True
         (ROOT / "private").mkdir(mode=0o700)
         atomic(ROOT / "private/owner", token)
