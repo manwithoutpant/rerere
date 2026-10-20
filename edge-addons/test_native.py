@@ -32,7 +32,7 @@ def certificates(base):
     ca, ca_key = base / "ca.crt", base / "ca.key"
     key, csr, cert = base / "tls.key", base / "tls.csr", base / "tls.crt"
     checked(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes",
-             "-keyout", ca_key, "-out", ca, "-days", "2", "-subj", "/CN=Edge test CA",
+             "-keyout", ca_key, "-out", ca, "-days", "30", "-subj", "/CN=Edge test CA",
              "-addext", "basicConstraints=critical,CA:TRUE"])
     checked(["openssl", "req", "-newkey", "rsa:2048", "-nodes", "-keyout", key,
              "-out", csr, "-subj", "/CN=edge-foreign.test"])
@@ -41,7 +41,7 @@ def certificates(base):
                    "basicConstraints=critical,CA:FALSE\n"
                    "keyUsage=digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\n")
     checked(["openssl", "x509", "-req", "-in", csr, "-CA", ca, "-CAkey", ca_key,
-             "-CAcreateserial", "-out", cert, "-days", "2", "-extfile", ext])
+             "-CAcreateserial", "-out", cert, "-days", "14", "-extfile", ext])
     return ca, cert, key
 
 class Echo(socketserver.BaseRequestHandler):
@@ -206,7 +206,8 @@ def native_tests(base):
                 e.wait_tcp(port, p)
                 attempt = subprocess.run(["curl", "--silent", "--max-time", "6", "--noproxy", "",
                     "--socks5-hostname", "127.0.0.1:" + str(port),
-                    "http://127.0.0.1:" + str(origin.server_port)], capture_output=True, timeout=10)
+                    "--cacert", ca, "--connect-to", "origin.test:" + str(origin.server_port) + ":127.0.0.1:" + str(origin.server_port),
+                    "https://origin.test:" + str(origin.server_port) + "/data"], capture_output=True, timeout=10)
                 assert attempt.returncode != 0, "Incorrect TUIC password was accepted."
             print("PASS incorrect TUIC password rejected.", flush=True)
     except BaseException:
