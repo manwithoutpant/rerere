@@ -134,8 +134,8 @@ def data_roundtrip(socks_port, origin_port, ca, base):
     print("PASS verified HTTPS download + upload: 524288 bytes each; SHA256=" +
           hashlib.sha256(PAYLOAD).hexdigest(), flush=True)
 
-def native_tests(base):
-    bins = e.prepare_binaries(base)
+def native_tests(base, offline=None):
+    bins = e.prepare_binaries(base, offline)
     ca, cert, key = certificates(base)
     foreign = e.new_state("foreign", "edge-foreign.test", "127.0.0.2", port=25443)
     peer = e.public_peer(foreign)
@@ -278,10 +278,11 @@ def systemd_test(base):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--systemd", action="store_true")
+    parser.add_argument("--offline-dir")
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix="edge-native-ci-") as work:
         base = pathlib.Path(work)
-        native_tests(base)
+        native_tests(base, args.offline_dir)
         if args.systemd:
             (base / "systemd-cert").mkdir()
             systemd_test(base)
