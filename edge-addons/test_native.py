@@ -134,12 +134,39 @@ def data_roundtrip(socks_port, origin_port, ca, base):
     print("PASS verified HTTPS download + upload: 524288 bytes each; SHA256=" +
           hashlib.sha256(PAYLOAD).hexdigest(), flush=True)
 
+def lab_port(avoid=None):
+    """Find a genuinely free loopback block; never assume fixed lab ports are free."""
+    for attempt in range(100):
+        port = 20000 + int.from_bytes(os.urandom(2), "big") % 40000
+        if avoid is not None and abs(port - avoid) < 8:
+            continue
+        sockets = []
+        try:
+            for address in ("127.0.0.1", "127.0.0.2", "127.0.0.3", "::1"):
+                family = socket.AF_INET6 if ":" in address else socket.AF_INET
+                for candidate in range(port, port + 4):
+                    for kind in (socket.SOCK_STREAM, socket.SOCK_DGRAM):
+                        s = socket.socket(family, kind)
+                        sockets.append(s)
+                        if family == socket.AF_INET6:
+                            s.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
+                        s.bind((address, candidate))
+            return port
+        except OSError:
+            continue
+        finally:
+            for s in sockets:
+                s.close()
+    raise RuntimeError("No free loopback port block for the native lab.")
+
 def native_tests(base, offline=None):
     bins = e.prepare_binaries(base, offline)
     ca, cert, key = certificates(base)
-    foreign = e.new_state("foreign", "edge-foreign.test", "127.0.0.2", ipv6="::1", port=25443)
+    foreign_port = lab_port()
+    iran_port = lab_port(avoid=foreign_port)
+    foreign = e.new_state("foreign", "edge-foreign.test", "127.0.0.2", ipv6="::1", port=foreign_port)
     peer = e.public_peer(foreign)
-    iran = e.new_state("iran", "edge-iran.test", "127.0.0.3", ipv6="::1", port=26443, peer=peer)
+    iran = e.new_state("iran", "edge-iran.test", "127.0.0.3", ipv6="::1", port=iran_port, peer=peer)
     assert not e.xhttp_out(peer)["streamSettings"]["tlsSettings"]["allowInsecure"]
     assert not e.tuic_client_out(foreign)["tls"]["insecure"]
     help_text = checked([bins / "lego", "--help"]).stdout.decode()
